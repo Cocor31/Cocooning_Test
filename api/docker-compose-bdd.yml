@@ -1,0 +1,22 @@
+version: '3.1'
+
+services:
+
+  bdd:
+    container_name: local_bdd
+    image: mariadb:latest
+
+    restart: always
+    volumes:
+      - ./local_bdd:/var/lib/mysql
+    env_file:
+      - .env
+    ports:
+      - 3306:3306
+
+  adminer:
+    container_name: adminer
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
