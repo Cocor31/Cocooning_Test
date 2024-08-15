@@ -4,6 +4,8 @@ const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 
 const DB = require("../db.config")
+const { createUserWithDefaultRole } = require('./utils/userUtils')
+const { handleBadRequestError, handleNotFoundError, handleUnauthorizedError, handleServerError } = require('./utils/errorHandler')
 const User = DB.User
 const Role = DB.Role
 
@@ -14,7 +16,7 @@ exports.login = async (req, res) => {
     const { email, password } = req.body
     // Check data from request
     if (!email || !password) {
-        return res.status(400).json({ message: 'Bad credentials' })
+        return handleBadRequestError(res, 'Bad credentials')
     }
 
     try {
@@ -22,12 +24,12 @@ exports.login = async (req, res) => {
         let user = await User.findOne({ where: { email: email }, include: Role })
         // Test si résultat
         if (user === null) {
-            return res.status(404).json({ message: `This user does not exist !` })
+            return handleNotFoundError(res, `This user does not exist !`)
         }
         // Password check  
         let test = await bcrypt.compare(password, user.password)
         if (!test) {
-            return res.status(401).json({ message: 'Wrong credentials' })
+            return handleUnauthorizedError(res, `This user does not exist !`)
         }
 
         // Get roles
@@ -47,7 +49,26 @@ exports.login = async (req, res) => {
 
         return res.json({ access_token: token, user_public_data: userPublicData })
     } catch (err) {
-        console.log(err)
+        return handleServerError(res, err)
     }
 }
+
+exports.signIn = async (req, res) => {
+    // Créer une nouvelle transaction
+    const transaction = await DB.sequelize.transaction();
+
+    try {
+        // Créer l'utilisateur avec le rôle par défaut
+        const newUser = await createUserWithDefaultRole(req, transaction);
+
+        // Valider la transaction
+        await transaction.commit();
+
+        return res.status(201).json({ message: 'User Created', data: newUser });
+
+    } catch (err) {
+        await transaction.rollback(); // Annuler la transaction en cas d'erreur
+        return handleServerError(res, err)
+    }
+};
 
